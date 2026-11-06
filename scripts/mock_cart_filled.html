@@ -1,0 +1,137 @@
+<div id="shopify-section-shop-cart-tray" class="shopify-section"><link href="//aspire-demo-2.myshopify.com/cdn/shop/t/214/assets/shop-cart-tray.css?v=92837535659501388501789974294" rel="stylesheet" type="text/css" media="all" />
+
+<shop-cart-drawer>
+  <div
+    class="drawer-wrapper main_drawer shop-cart-drawer-shell shop-cart-drawer color-scheme-1"
+    id="cart-drawer"
+    inert
+    role="dialog"
+    aria-modal="true"
+    aria-label="MY CART"
+  >
+    <div class="drawer-wrapper_inner shop-cart-drawer__panel" data-lenis-prevent>
+      
+        <header class="drawer_header shop-cart-drawer__header">
+          <div>
+            <h4 class="h6">MY CART </h4>
+          </div>
+          <div class="sc_drawer_close">
+
+          <shop-cart-drawer-close>
+            <button class="theme-drawer__close" aria-label="Close">
+              <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 15 15" fill="none">
+<path d="M15 1.5L13.5 0L7.5 6L1.5 0L0 1.5L6 7.5L0 13.5L1.5 15L7.5 9L13.5 15L15 13.5L9 7.5L15 1.5Z" fill="#252525"/>
+</svg>
+            </button>
+          </shop-cart-drawer-close>
+          </div>
+        </header>
+
+        <div class="sc_empty_body">
+          <h4 class="h6">My cart is currently empty.</h4>
+          <div class="sc_empty_action">
+            <a class="btn" aria-label="Continue shopping" href="/collections/all">
+              <span class="atc_text btn-txt">Continue shopping</span>
+            </a>
+          </div>
+        </div>
+
+      
+    </div>
+  </div>
+</shop-cart-drawer>
+
+<script
+  defer
+>
+  const SCD_FREE_SHIP_MIN = Number(5000);
+  const SCD_BASE_CUR = "USD";
+  const SCD_ACTIVE_CUR = "USD";
+  const SCD_SPEND_LABEL = "Spend";
+  const SCD_MORE_LABEL = " more for Free Shipping";
+  const SCD_DONE_LABEL = "Congratulations! You qualify for free delivery";
+
+  function scdRate(cartCurrency) {
+    if (!cartCurrency || cartCurrency === SCD_BASE_CUR) return 1;
+
+    if (window.Shopify?.currency?.active === cartCurrency && Number(window.Shopify.currency.rate) > 0) {
+      return Number(window.Shopify.currency.rate);
+    }
+
+    return Number(window.Shopify?.currency?.rate) > 0 ? Number(window.Shopify.currency.rate) : 1;
+  }
+
+  function scdFormat(amountInMajorUnits, currencyCode) {
+    const amount = Number(amountInMajorUnits) || 0;
+
+    try {
+      return new Intl.NumberFormat(document.documentElement.lang || undefined, {
+        style: 'currency',
+        currency: currencyCode || SCD_ACTIVE_CUR || SCD_BASE_CUR
+      }).format(amount);
+    } catch (error) {
+      return Shopify.formatMoney(Math.round(amount * 100));
+    }
+  }
+
+  function scdUpdateBar(totalPriceInCents = 0, cartCurrency = SCD_ACTIVE_CUR) {
+    const drawer = document.querySelector('.shop-cart-drawer-shell');
+    if (!drawer) return;
+
+    const shippingMsg = drawer.querySelector('.shop-cart-shipping__message p');
+    const bar = drawer.querySelector('.shop-cart-shipping__meter-fill');
+    const wrapper = drawer.querySelector('.shop-cart-shipping[data-shop-cart-shipping-bar]');
+    if (!shippingMsg || !bar || !wrapper) return;
+
+    const rate = scdRate(cartCurrency);
+    const thresholdInCents = Math.round(SCD_FREE_SHIP_MIN * rate * 100);
+    const normalizedTotal = Number(totalPriceInCents) || 0;
+    const remainingInCents = thresholdInCents - normalizedTotal;
+    const percentage = thresholdInCents > 0
+      ? Math.min((normalizedTotal / thresholdInCents) * 100, 100)
+      : 0;
+
+    if (remainingInCents > 0) {
+      shippingMsg.textContent = `${SCD_SPEND_LABEL} ${scdFormat(remainingInCents / 100, cartCurrency)} ${SCD_MORE_LABEL}`;
+    } else {
+      shippingMsg.textContent = SCD_DONE_LABEL;
+    }
+
+    bar.style.setProperty('--width', `${percentage}%`);
+    wrapper.classList.remove('active');
+    requestAnimationFrame(() => {
+      wrapper.classList.add('active');
+    });
+
+    if (percentage >= 100) {
+      wrapper.classList.add('sc-ship-done');
+    } else {
+      wrapper.classList.remove('sc-ship-done');
+    }
+  }
+
+  function scdRefreshBar(cartData) {
+    if (cartData && typeof cartData.total_price === 'number') {
+      scdUpdateBar(cartData.total_price, cartData.currency || SCD_ACTIVE_CUR);
+      return;
+    }
+
+    fetch('/cart.js')
+      .then((res) => res.json())
+      .then((cart) => {
+        scdUpdateBar(cart.total_price, cart.currency || SCD_ACTIVE_CUR);
+      })
+      .catch(() => {
+        scdUpdateBar(0, SCD_ACTIVE_CUR);
+      });
+  }
+
+  document.addEventListener('DOMContentLoaded', () => scdRefreshBar());
+  document.addEventListener('cart-update', (e) => {
+    requestAnimationFrame(() => {
+      scdRefreshBar(e.detail);
+    });
+  });
+</script>
+
+</div>
